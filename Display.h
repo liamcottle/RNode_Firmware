@@ -16,7 +16,7 @@
 #include "Graphics.h"
 #include <Adafruit_GFX.h>
 
-#if BOARD_MODEL == BOARD_TDECK
+#if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_HELTEC_T114
   #include <Adafruit_ST7789.h>
 #elif BOARD_MODEL == BOARD_TBEAM_S_V1
   #include <Adafruit_SH110X.h>
@@ -77,6 +77,10 @@
   Adafruit_ST7789 display = Adafruit_ST7789(DISPLAY_CS, DISPLAY_DC, -1);
   #define SSD1306_WHITE ST77XX_WHITE
   #define SSD1306_BLACK ST77XX_BLACK
+#elif BOARD_MODEL == BOARD_HELTEC_T114
+  Adafruit_ST7789 display = Adafruit_ST7789(&SPI1, DISPLAY_CS, DISPLAY_DC, DISPLAY_RST);
+  #define SSD1306_WHITE ST77XX_WHITE
+  #define SSD1306_BLACK ST77XX_BLACK
 #elif BOARD_MODEL == BOARD_TBEAM_S_V1
   Adafruit_SH1106G display = Adafruit_SH1106G(128, 64, &Wire, -1);
   #define SSD1306_WHITE SH110X_WHITE
@@ -135,6 +139,9 @@ void update_area_positions() {
 uint8_t display_contrast = 0x00;
 #if BOARD_MODEL == BOARD_TBEAM_S_V1
   void set_contrast(Adafruit_SH1106G *display, uint8_t value) {
+  }
+#elif BOARD_MODEL == BOARD_HELTEC_T114
+  void set_contrast(Adafruit_ST7789 *display, uint8_t value) {
   }
 #elif BOARD_MODEL == BOARD_TDECK
   void set_contrast(Adafruit_ST7789 *display, uint8_t value) {
@@ -197,6 +204,24 @@ bool display_init() {
       delay(50);
       digitalWrite(pin_display_en, HIGH);
       Wire.begin(SDA_OLED, SCL_OLED);
+    #elif BOARD_MODEL == BOARD_HELTEC_T114
+
+      // enable vext (not required for screen to work, but is done in Heltec example)
+      digitalWrite(PIN_T114_VEXT_EN, HIGH);
+      pinMode(PIN_T114_VEXT_EN, OUTPUT);
+
+      // enable power to display
+      digitalWrite(PIN_T114_TFT_EN, LOW);
+      pinMode(PIN_T114_TFT_EN, OUTPUT);
+
+      // enable backlight led (display is always black without this)
+      digitalWrite(PIN_T114_TFT_BLGT, LOW);
+      pinMode(PIN_T114_TFT_BLGT, OUTPUT);
+
+      // enable adc (not required for screen to work, but is done in Heltec example)
+      digitalWrite(PIN_T114_ADC_EN, HIGH);
+      pinMode(PIN_T114_ADC_EN, OUTPUT);
+
     #elif BOARD_MODEL == BOARD_TBEAM_S_V1
       Wire.begin(SDA_OLED, SCL_OLED);
     #endif
@@ -227,6 +252,10 @@ bool display_init() {
     #if BOARD_MODEL == BOARD_TDECK
     display.init(240, 320);
     display.setSPISpeed(80e6);
+    if (false) {
+    #elif BOARD_MODEL == BOARD_HELTEC_T114
+    display.init(135, 240);
+    display.setSPISpeed(40000000);
     if (false) {
     #elif BOARD_MODEL == BOARD_TBEAM_S_V1
     if (!display.begin(display_address, true)) {
@@ -263,6 +292,9 @@ bool display_init() {
       #elif BOARD_MODEL == BOARD_HELTEC32_V3
         disp_mode = DISP_MODE_PORTRAIT;
         display.setRotation(1);
+      #elif BOARD_MODEL == BOARD_HELTEC_T114
+        disp_mode = DISP_MODE_LANDSCAPE;
+        display.setRotation(3);
       #elif BOARD_MODEL == BOARD_RAK4631
         disp_mode = DISP_MODE_LANDSCAPE;
         display.setRotation(0);
@@ -293,7 +325,7 @@ bool display_init() {
         #endif
       #endif
 
-      #if BOARD_MODEL == BOARD_TDECK
+      #if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_HELTEC_T114
         display.fillScreen(SSD1306_BLACK);
       #endif
 
@@ -718,7 +750,7 @@ void update_display(bool blank = false) {
         set_contrast(&display, display_contrast);
       }
 
-      #if BOARD_MODEL != BOARD_TDECK
+      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
         display.clearDisplay();
         display.display();
       #else
@@ -734,14 +766,14 @@ void update_display(bool blank = false) {
         set_contrast(&display, display_contrast);
       }
 
-      #if BOARD_MODEL != BOARD_TDECK
+      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
         display.clearDisplay();
       #endif
 
       update_stat_area();
       update_disp_area();
 
-      #if BOARD_MODEL != BOARD_TDECK
+      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
         display.display();
       #endif
       last_disp_update = millis();
