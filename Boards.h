@@ -701,6 +701,10 @@
 
   #endif
 
+  #ifndef DISPLAY_SCALE
+    #define DISPLAY_SCALE 1
+  #endif
+
   #ifndef HAS_RF_SWITCH_RX_TX
     const int pin_rxen = -1;
     const int pin_txen = -1;

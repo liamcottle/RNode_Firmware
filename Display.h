@@ -122,11 +122,6 @@ int p_as_y = 0;
 GFXcanvas1 stat_area(64, 64);
 GFXcanvas1 disp_area(64, 64);
 
-// default display scale for boards that don't provide one
-#ifndef DISPLAY_SCALE
-  #define DISPLAY_SCALE 1
-#endif
-
 void update_area_positions() {
   if (disp_mode == DISP_MODE_PORTRAIT) {
     p_ad_x = 0 * DISPLAY_SCALE;
