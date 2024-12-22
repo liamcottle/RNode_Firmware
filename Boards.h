@@ -660,6 +660,7 @@
       #define PIN_T114_BUSY 17
 
       // TFT
+      #define DISPLAY_SCALE 2
       #define PIN_T114_TFT_MOSI 9
       #define PIN_T114_TFT_MISO 11 // not connected
       #define PIN_T114_TFT_SCK 8

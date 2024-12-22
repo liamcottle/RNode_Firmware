@@ -122,17 +122,22 @@ int p_as_y = 0;
 GFXcanvas1 stat_area(64, 64);
 GFXcanvas1 disp_area(64, 64);
 
+// default display scale for boards that don't provide one
+#ifndef DISPLAY_SCALE
+  #define DISPLAY_SCALE 1
+#endif
+
 void update_area_positions() {
   if (disp_mode == DISP_MODE_PORTRAIT) {
-    p_ad_x = 0;
-    p_ad_y = 0;
-    p_as_x = 0;
-    p_as_y = 64;
+    p_ad_x = 0 * DISPLAY_SCALE;
+    p_ad_y = 0 * DISPLAY_SCALE;
+    p_as_x = 0 * DISPLAY_SCALE;
+    p_as_y = 64 * DISPLAY_SCALE;
   } else if (disp_mode == DISP_MODE_LANDSCAPE) {
-    p_ad_x = 0;
-    p_ad_y = 0;
-    p_as_x = 64;
-    p_as_y = 0;
+    p_ad_x = 0 * DISPLAY_SCALE;
+    p_ad_y = 0 * DISPLAY_SCALE;
+    p_as_x = 64 * DISPLAY_SCALE;
+    p_as_y = 0 * DISPLAY_SCALE;
   }
 }
 
@@ -537,22 +542,44 @@ void draw_stat_area() {
   }
 }
 
+// draws a bitmap to the display and auto scales it based on the boards configured DISPLAY_SCALE
+void drawBitmap(int16_t startX, int16_t startY, const uint8_t* bitmap, int16_t bitmapWidth, int16_t bitmapHeight, uint16_t foregroundColour, uint16_t backgroundColour) {
+    for(int16_t row = 0; row < bitmapHeight; row++){
+        for(int16_t col = 0; col < bitmapWidth; col++){
+
+            // determine index and bitmask
+            int16_t index = row * ((bitmapWidth + 7) / 8) + (col / 8);
+            uint8_t bitmask = 1 << (7 - (col % 8));
+
+            // check if the current pixel is set in the bitmap
+            if(bitmap[index] & bitmask){
+                // draw a scaled rectangle for the foreground pixel
+                display.fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, foregroundColour);
+            } else {
+                // draw a scaled rectangle for the background pixel
+                display.fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, backgroundColour);
+            }
+
+        }
+    }
+}
+
 void update_stat_area() {
   if (eeprom_ok && !firmware_update_mode && !console_active) {
 
     draw_stat_area();
     if (disp_mode == DISP_MODE_PORTRAIT) {
-      display.drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+      drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
     } else if (disp_mode == DISP_MODE_LANDSCAPE) {
-      display.drawBitmap(p_as_x+2, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+      drawBitmap(p_as_x+2, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
       if (device_init_done && !disp_ext_fb) display.drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
     }
 
   } else {
     if (firmware_update_mode) {
-      display.drawBitmap(p_as_x, p_as_y, bm_updating, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
+      drawBitmap(p_as_x, p_as_y, bm_updating, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
     } else if (console_active && device_init_done) {
-      display.drawBitmap(p_as_x, p_as_y, bm_console, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
+      drawBitmap(p_as_x, p_as_y, bm_console, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
       if (disp_mode == DISP_MODE_LANDSCAPE) {
         display.drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
       }
@@ -715,7 +742,7 @@ void draw_disp_area() {
 void update_disp_area() {
   draw_disp_area();
 
-  display.drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), SSD1306_WHITE, SSD1306_BLACK);
+  drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), SSD1306_WHITE, SSD1306_BLACK);
   if (disp_mode == DISP_MODE_LANDSCAPE) {
     if (device_init_done && !firmware_update_mode && !disp_ext_fb) {
       display.drawLine(0, 0, 0, 63, SSD1306_WHITE);
