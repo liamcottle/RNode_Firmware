@@ -16,8 +16,11 @@
 #include "Graphics.h"
 #include <Adafruit_GFX.h>
 
-#if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_HELTEC_T114
+#if BOARD_MODEL == BOARD_TDECK 
   #include <Adafruit_ST7789.h>
+#elif BOARD_MODEL == BOARD_HELTEC_T114
+  #include "ST7789Spi.h"
+  #define COLOR565(r, g, b) (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3))
 #elif BOARD_MODEL == BOARD_TBEAM_S_V1
   #include <Adafruit_SH110X.h>
 #else
@@ -78,7 +81,7 @@
   #define SSD1306_WHITE ST77XX_WHITE
   #define SSD1306_BLACK ST77XX_BLACK
 #elif BOARD_MODEL == BOARD_HELTEC_T114
-  Adafruit_ST7789 display = Adafruit_ST7789(&SPI1, DISPLAY_CS, DISPLAY_DC, DISPLAY_RST);
+  ST7789Spi display(&SPI1, DISPLAY_RST, DISPLAY_DC, DISPLAY_CS);
   #define SSD1306_WHITE ST77XX_WHITE
   #define SSD1306_BLACK ST77XX_BLACK
 #elif BOARD_MODEL == BOARD_TBEAM_S_V1
@@ -141,7 +144,7 @@ uint8_t display_contrast = 0x00;
   void set_contrast(Adafruit_SH1106G *display, uint8_t value) {
   }
 #elif BOARD_MODEL == BOARD_HELTEC_T114
-  void set_contrast(Adafruit_ST7789 *display, uint8_t value) {
+  void set_contrast(ST7789Spi *display, uint8_t value) {
   }
 #elif BOARD_MODEL == BOARD_TDECK
   void set_contrast(Adafruit_ST7789 *display, uint8_t value) {
@@ -254,8 +257,9 @@ bool display_init() {
     display.setSPISpeed(80e6);
     if (false) {
     #elif BOARD_MODEL == BOARD_HELTEC_T114
-    display.init(135, 240);
-    display.setSPISpeed(40000000);
+    display.init();
+    // set white as default pixel colour for Heltec T114
+    display.setRGB(COLOR565(0xFF, 0xFF, 0xFF));
     if (false) {
     #elif BOARD_MODEL == BOARD_TBEAM_S_V1
     if (!display.begin(display_address, true)) {
@@ -294,7 +298,6 @@ bool display_init() {
         display.setRotation(1);
       #elif BOARD_MODEL == BOARD_HELTEC_T114
         disp_mode = DISP_MODE_LANDSCAPE;
-        display.setRotation(3);
       #elif BOARD_MODEL == BOARD_RAK4631
         disp_mode = DISP_MODE_LANDSCAPE;
         display.setRotation(0);
@@ -315,7 +318,10 @@ bool display_init() {
 
       stat_area.cp437(true);
       disp_area.cp437(true);
+
+      #if BOARD_MODEL != BOARD_HELTEC_T114
       display.cp437(true);
+      #endif
 
       #if HAS_EEPROM
         #if MCU_VARIANT != MCU_NRF52
@@ -325,7 +331,7 @@ bool display_init() {
         #endif
       #endif
 
-      #if BOARD_MODEL == BOARD_TDECK || BOARD_MODEL == BOARD_HELTEC_T114
+      #if BOARD_MODEL == BOARD_TDECK
         display.fillScreen(SSD1306_BLACK);
       #endif
 
@@ -537,6 +543,34 @@ void draw_stat_area() {
   }
 }
 
+// draws a line on the screen
+void drawLine(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colour) {
+  #if BOARD_MODEL == BOARD_HELTEC_T114
+  if(colour == SSD1306_WHITE){
+    display.setColor(WHITE);
+  } else if(colour == SSD1306_BLACK) {
+    display.setColor(BLACK);
+  }
+  display.drawLine(x, y, width, height);
+  #else
+  display.drawLine(x, y, width, height, colour);
+  #endif
+}
+
+// draws a filled rectangle on the screen
+void fillRect(int16_t x, int16_t y, int16_t width, int16_t height, uint16_t colour) {
+  #if BOARD_MODEL == BOARD_HELTEC_T114
+  if(colour == SSD1306_WHITE){
+    display.setColor(WHITE);
+  } else if(colour == SSD1306_BLACK) {
+    display.setColor(BLACK);
+  }
+  display.fillRect(x, y, width, height);
+  #else
+  display.fillRect(x, y, width, height, colour);
+  #endif
+}
+
 // draws a bitmap to the display and auto scales it based on the boards configured DISPLAY_SCALE
 void drawBitmap(int16_t startX, int16_t startY, const uint8_t* bitmap, int16_t bitmapWidth, int16_t bitmapHeight, uint16_t foregroundColour, uint16_t backgroundColour) {
     for(int16_t row = 0; row < bitmapHeight; row++){
@@ -549,10 +583,10 @@ void drawBitmap(int16_t startX, int16_t startY, const uint8_t* bitmap, int16_t b
             // check if the current pixel is set in the bitmap
             if(bitmap[index] & bitmask){
                 // draw a scaled rectangle for the foreground pixel
-                display.fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, foregroundColour);
+                fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, foregroundColour);
             } else {
                 // draw a scaled rectangle for the background pixel
-                display.fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, backgroundColour);
+                fillRect(startX + col * DISPLAY_SCALE, startY + row * DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE, backgroundColour);
             }
 
         }
@@ -567,7 +601,7 @@ void update_stat_area() {
       drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
     } else if (disp_mode == DISP_MODE_LANDSCAPE) {
       drawBitmap(p_as_x+2, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), SSD1306_WHITE, SSD1306_BLACK);
-      if (device_init_done && !disp_ext_fb) display.drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
+      if (device_init_done && !disp_ext_fb) drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
     }
 
   } else {
@@ -576,7 +610,7 @@ void update_stat_area() {
     } else if (console_active && device_init_done) {
       drawBitmap(p_as_x, p_as_y, bm_console, stat_area.width(), stat_area.height(), SSD1306_BLACK, SSD1306_WHITE);
       if (disp_mode == DISP_MODE_LANDSCAPE) {
-        display.drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
+        drawLine(p_as_x, 0, p_as_x, 64, SSD1306_WHITE);
       }
     }
   }
@@ -740,7 +774,7 @@ void update_disp_area() {
   drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), SSD1306_WHITE, SSD1306_BLACK);
   if (disp_mode == DISP_MODE_LANDSCAPE) {
     if (device_init_done && !firmware_update_mode && !disp_ext_fb) {
-      display.drawLine(0, 0, 0, 63, SSD1306_WHITE);
+      drawLine(0, 0, 0, 63, SSD1306_WHITE);
     }
   }
 }
@@ -772,7 +806,10 @@ void update_display(bool blank = false) {
         set_contrast(&display, display_contrast);
       }
 
-      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
+      #if BOARD_MODEL == BOARD_HELTEC_T114
+        display.clear();
+        display.display();
+      #elif BOARD_MODEL != BOARD_TDECK
         display.clearDisplay();
         display.display();
       #else
@@ -788,14 +825,16 @@ void update_display(bool blank = false) {
         set_contrast(&display, display_contrast);
       }
 
-      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
+      #if BOARD_MODEL == BOARD_HELTEC_T114
+        display.clear();
+      #elif BOARD_MODEL != BOARD_TDECK
         display.clearDisplay();
       #endif
 
       update_stat_area();
       update_disp_area();
 
-      #if BOARD_MODEL != BOARD_TDECK && BOARD_MODEL != BOARD_HELTEC_T114
+      #if BOARD_MODEL != BOARD_TDECK
         display.display();
       #endif
       last_disp_update = millis();
